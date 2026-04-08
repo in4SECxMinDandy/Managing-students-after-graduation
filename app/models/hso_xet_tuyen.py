@@ -1,5 +1,6 @@
 """
-HSOXetTuyen Model - Bảng hso_xet_tuyen (Candidate Profile)
+HSOXetTuyen Model - Bang hso_xet_tuyen (Ho so xet tuyen)
+Luu tru truc tiep thong tin thi sinh (ho_ten, cccd, so_dien_thoai)
 """
 from app.models.base import BaseModel
 
@@ -9,28 +10,16 @@ class HSOXetTuyen(BaseModel):
     primary_key = "ma_hs"
 
     @classmethod
-    def get_tai_khoan(cls, ma_hs: str):
-        """Lấy thông tin tài khoản thí sinh"""
-        result = cls.raw_query(
-            """SELECT t.* FROM tk_xet_tuyen t
-               INNER JOIN hso_xet_tuyen h ON t.ma_tk = h.ma_tk
-               WHERE h.ma_hs = %s""",
-            (ma_hs,),
-            fetch_one=True
-        )
-        return result
-
-    @classmethod
     def get_phieu_dang_ky(cls, ma_hs: str):
-        """Lấy danh sách phiếu đăng ký xét tuyển"""
+        """Lay danh sach phieu dang ky xet tuyen"""
         return cls.raw_query(
-            "SELECT * FROM pt_xet_tuyen WHERE ma_tk = %s",
+            "SELECT * FROM pt_xet_tuyen WHERE ma_hs = %s",
             (ma_hs,)
         )
 
     @classmethod
     def get_sinh_vien(cls, ma_hs: str):
-        """Lấy sinh viên được tạo từ hồ sơ"""
+        """Lay sinh vien duoc tao tu ho so"""
         result = cls.raw_query(
             "SELECT * FROM sinh_vien WHERE ma_hs = %s",
             (ma_hs,),

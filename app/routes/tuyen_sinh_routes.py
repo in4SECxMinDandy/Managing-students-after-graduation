@@ -1,26 +1,27 @@
 """
 TuyenSinh Routes - Endpoints cho tuyển sinh
+- Public: Nop ho so, nop phieu, xem trang thai (khong can dang nhap)
+- Admin: Duyet, tu choi, xem danh sach
 """
 from flask import Blueprint, request, jsonify, g
 
 from app.services.tuyen_sinh_service import TuyenSinhService
-from app.middleware.jwt_auth import admin_required, candidate_required, jwt_required
+from app.middleware.jwt_auth import admin_required
 
 tuyen_sinh_bp = Blueprint("tuyen_sinh", __name__)
 
 
+# ========== Public Endpoints (khong can dang nhap) ==========
+
 @tuyen_sinh_bp.route("/submit-profile", methods=["POST"])
-@candidate_required
 def submit_profile():
     """
-    Thí sinh nộp hồ sơ
+    Nop ho so xet tuyen (khong can dang nhap)
     Body: {ho_ten, cccd, so_dien_thoai}
     """
     data = request.get_json()
-    ma_tk = g.current_user["ma_tk"]
 
     result = TuyenSinhService.submit_profile(
-        ma_tk,
         data.get("ho_ten"),
         data.get("cccd"),
         data.get("so_dien_thoai")
@@ -32,17 +33,15 @@ def submit_profile():
 
 
 @tuyen_sinh_bp.route("/submit-application", methods=["POST"])
-@candidate_required
 def submit_application():
     """
-    Thí sinh nộp phiếu đăng ký xét tuyển
-    Body: {ma_nganh, phuong_thuc, diem}
+    Nop phieu dang ky xet tuyen (khong can dang nhap)
+    Body: {ma_hs, ma_nganh, phuong_thuc, diem}
     """
     data = request.get_json()
-    ma_tk = g.current_user["ma_tk"]
 
     result = TuyenSinhService.submit_application(
-        ma_tk,
+        data.get("ma_hs"),
         data.get("ma_nganh"),
         data.get("phuong_thuc"),
         data.get("diem")
@@ -53,12 +52,10 @@ def submit_application():
     return jsonify({"error": "Bad Request", "message": result["message"]}), 400
 
 
-@tuyen_sinh_bp.route("/status", methods=["GET"])
-@candidate_required
-def get_status():
-    """Thí sinh xem trạng thái đơn"""
-    ma_tk = g.current_user["ma_tk"]
-    result = TuyenSinhService.get_candidate_status(ma_tk)
+@tuyen_sinh_bp.route("/status/<ma_hs>", methods=["GET"])
+def get_status(ma_hs):
+    """Xem trang thai ho so (khong can dang nhap)"""
+    result = TuyenSinhService.get_profile_status(ma_hs)
 
     if result["success"]:
         return jsonify(result)
@@ -70,10 +67,10 @@ def get_status():
 @tuyen_sinh_bp.route("/pending", methods=["GET"])
 @admin_required
 def get_pending():
-    """Admin: Lấy danh sách phiếu chờ duyệt"""
+    """Admin: Lay danh sach phieu cho duyet"""
     from app.models.pt_xet_tuyen import PTXetTuyen
     pt_list = PTXetTuyen.get_all_with_details()
-    # Filter chỉ lấy chờ duyệt
+    # Filter chi lay cho duyet
     pending = [pt for pt in pt_list if pt["trang_thai"] == "Cho duyet"]
     return jsonify({"success": True, "data": pending})
 
@@ -81,7 +78,7 @@ def get_pending():
 @tuyen_sinh_bp.route("/all", methods=["GET"])
 @admin_required
 def get_all():
-    """Admin: Lấy tất cả phiếu xét tuyển"""
+    """Admin: Lay tat ca phieu xet tuyen"""
     from app.models.pt_xet_tuyen import PTXetTuyen
     pt_list = PTXetTuyen.get_all_with_details()
     return jsonify({"success": True, "data": pt_list})
@@ -90,7 +87,7 @@ def get_all():
 @tuyen_sinh_bp.route("/approve/<ma_pt>", methods=["POST"])
 @admin_required
 def approve(ma_pt):
-    """Admin duyệt đậu tuyển sinh"""
+    """Admin duyet dau tuyen sinh"""
     ma_admin = g.current_user["ma_qt"]
     result = TuyenSinhService.approve_application(ma_pt, ma_admin)
 
@@ -102,7 +99,7 @@ def approve(ma_pt):
 @tuyen_sinh_bp.route("/reject/<ma_pt>", methods=["POST"])
 @admin_required
 def reject(ma_pt):
-    """Admin từ chối tuyển sinh"""
+    """Admin tu choi tuyen sinh"""
     ma_admin = g.current_user["ma_qt"]
     result = TuyenSinhService.reject_application(ma_pt, ma_admin)
 
@@ -114,7 +111,7 @@ def reject(ma_pt):
 @tuyen_sinh_bp.route("/approve-all", methods=["POST"])
 @admin_required
 def approve_all():
-    """Admin duyệt tất cả phiếu chờ duyệt"""
+    """Admin duyet tat ca phieu cho duyet"""
     from app.models.pt_xet_tuyen import PTXetTuyen
     ma_admin = g.current_user["ma_qt"]
 

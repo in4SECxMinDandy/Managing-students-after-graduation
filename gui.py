@@ -146,7 +146,7 @@ class LoginWindow:
         role_frame = tk.Frame(form_frame, bg="white")
         role_frame.pack(pady=5, padx=50, fill="x")
 
-        roles = [("Admin", "admin"), ("Sinh viên", "student"), ("Thí sinh", "candidate")]
+        roles = [("Admin", "admin"), ("Sinh viên", "student")]
         for text, value in roles:
             rb = tk.Radiobutton(role_frame, text=text, variable=self.role_var,
                                value=value, font=("Segoe UI", 10), bg="white",
@@ -195,9 +195,6 @@ class LoginWindow:
         elif role == "student":
             self.username_label.config(text="Mã sinh viên:")
             self.password_label.config(text="Mật khẩu:")
-        else:
-            self.username_label.config(text="Email:")
-            self.password_label.config(text="Mật khẩu:")
 
         self.username_entry.delete(0, tk.END)
         self.password_entry.delete(0, tk.END)
@@ -218,7 +215,8 @@ class LoginWindow:
         elif role == "student":
             data = {"role": "student", "ma_sv": username, "mat_khau": password}
         else:
-            data = {"role": "candidate", "email": username, "mat_khau": password}
+            messagebox.showerror("Lỗi", "Vai trò không hợp lệ")
+            return
 
         self.login_btn.config(state="disabled", text="Đang đăng nhập...")
 
@@ -238,16 +236,14 @@ class LoginWindow:
             messagebox.showerror("Lỗi", result.get("message", "Đăng nhập thất bại"))
 
     def open_dashboard(self):
-        """Mở dashboard theo role"""
+        """Mo dashboard theo role"""
         if api.role == "admin":
             AdminDashboard(tk.Tk())
         elif api.role == "student":
             StudentDashboard(tk.Tk())
-        else:
-            CandidateDashboard(tk.Tk())
 
 
-# ========== Base Dashboard ==========
+# ========== Main Entry Point ==========
 
 class BaseDashboard:
     def __init__(self, root, title: str):
@@ -983,209 +979,6 @@ class StudentDashboard(BaseDashboard):
 
                 if not tb.get("TrangThaiDoc"):
                     api.post(f"/thong-bao/read/{tb.get('MaTB')}")
-
-    def clear_content(self):
-        for w in self.content.winfo_children():
-            w.destroy()
-
-
-# ========== Candidate Dashboard ==========
-
-class CandidateDashboard(BaseDashboard):
-    def __init__(self, root):
-        self.ma_tk = api.user.get("MaTK", "")
-        super().__init__(root, "Thí sinh")
-
-    def setup_ui(self):
-        header = tk.Frame(self.root, bg="#1565C0", height=60)
-        header.pack(fill="x")
-        header.pack_propagate(False)
-
-        tk.Label(header, text="THÍ SINH",
-                font=("Segoe UI", 16, "bold"),
-                bg="#1565C0", fg="white").pack(side="left", padx=20)
-
-        tk.Label(header, text=f"Email: {api.user.get('Email', '')}",
-                font=("Segoe UI", 10), bg="#1565C0", fg="#BBDEFB").pack(side="right", padx=20)
-        tk.Button(header, text="Đăng xuất", command=self.logout,
-                 bg="#D32F2F", fg="white", relief="flat",
-                 cursor="hand2").pack(side="right", padx=10)
-
-        main = tk.Frame(self.root)
-        main.pack(fill="both", expand=True)
-
-        sidebar = tk.Frame(main, bg="#6A1B9A", width=200)
-        sidebar.pack(side="left", fill="y")
-        sidebar.pack_propagate(False)
-
-        nav_items = [
-            ("Nộp hồ sơ", self.show_profile_form),
-            ("Đăng ký xét tuyển", self.show_apply),
-            ("Trạng thái", self.show_status),
-        ]
-
-        tk.Label(sidebar, text="MENU", font=("Segoe UI", 10, "bold"),
-                bg="#6A1B9A", fg="#CE93D8").pack(pady=15, padx=10)
-
-        for text, cmd in nav_items:
-            btn = self.create_nav_button(sidebar, text, cmd)
-            btn.configure(bg="#7B1FA2")
-            btn.pack(fill="x", padx=5, pady=2)
-
-        self.content = tk.Frame(main, bg="#f5f5f5")
-        self.content.pack(side="right", fill="both", expand=True)
-
-        self.show_profile_form()
-
-    def show_profile_form(self):
-        self.clear_content()
-
-        fr = tk.Frame(self.content, bg="white")
-        fr.pack(pady=20, padx=40, fill="both", expand=True)
-
-        tk.Label(fr, text="NỘP HỒ SƠ XÉT TUYỂN",
-                font=("Segoe UI", 14, "bold"),
-                bg="white").pack(pady=15)
-
-        # Kiểm tra đã có hồ sơ chưa
-        status = api.get("/tuyen-sinh/status")
-        if status.get("success") and status["data"].get("ho_so"):
-            hso = status["data"]["ho_so"]
-            tk.Label(fr, text="Đã có hồ sơ",
-                    font=("Segoe UI", 11), bg="white", fg="green").pack()
-            info = [("Họ tên:", hso.get("HoTen", "")),
-                   ("CCCD:", hso.get("CCCD", "")),
-                   ("SĐT:", hso.get("SDT", ""))]
-            for label, val in info:
-                tk.Label(fr, text=f"{label} {val}", font=("Segoe UI", 10),
-                        bg="white").pack(anchor="w", padx=50, pady=2)
-            return
-
-        fields = [("Họ tên:", "ho_ten"), ("CCCD:", "cccd"), ("SĐT:", "sdt")]
-        entries = {}
-
-        for label, key in fields:
-            row = tk.Frame(fr, bg="white")
-            row.pack(fill="x", padx=50, pady=5)
-            tk.Label(row, text=label, font=("Segoe UI", 10),
-                    width=10, bg="white").pack(side="left")
-            e = tk.Entry(row, font=("Segoe UI", 10))
-            e.pack(side="right", fill="x", expand=True)
-            entries[key] = e
-
-        def submit():
-            data = {k: e.get().strip() for k, e in entries.items()}
-            if not all(data.values()):
-                messagebox.showwarning("Cảnh báo", "Nhập đầy đủ thông tin")
-                return
-            result = api.post("/tuyen-sinh/submit-profile", data)
-            if result.get("success"):
-                messagebox.showinfo("Thành công", "Đã nộp hồ sơ")
-                self.show_profile_form()
-            else:
-                messagebox.showerror("Lỗi", result.get("message", "Lỗi"))
-
-        tk.Button(fr, text="Nộp hồ sơ", command=submit,
-                 bg="#6A1B9A", fg="white", relief="flat",
-                 cursor="hand2").pack(pady=15)
-
-    def show_apply(self):
-        self.clear_content()
-
-        fr = tk.Frame(self.content, bg="white")
-        fr.pack(pady=20, padx=40, fill="both", expand=True)
-
-        tk.Label(fr, text="ĐĂNG KÝ XÉT TUYỂN",
-                font=("Segoe UI", 14, "bold"),
-                bg="white").pack(pady=15)
-
-        # Lấy danh sách ngành
-        nganh_result = api.get("/nganh/")
-        nganh_list = nganh_result.get("data", [])
-
-        if not nganh_list:
-            tk.Label(fr, text="Chưa có ngành tuyển sinh",
-                    font=("Segoe UI", 11), bg="white").pack(pady=30)
-            return
-
-        row1 = tk.Frame(fr, bg="white")
-        row1.pack(fill="x", padx=50, pady=5)
-        tk.Label(row1, text="Ngành:", font=("Segoe UI", 10),
-                width=10, bg="white").pack(side="left")
-        nganh_combo = ttk.Combobox(row1, values=[f"{n['MaNganh']} - {n['TenNganh']}"
-                                                  for n in nganh_list])
-        nganh_combo.pack(side="right", fill="x", expand=True)
-
-        row2 = tk.Frame(fr, bg="white")
-        row2.pack(fill="x", padx=50, pady=5)
-        tk.Label(row2, text="Phương thức:", font=("Segoe UI", 10),
-                width=10, bg="white").pack(side="left")
-        pt_entry = tk.Entry(row2, font=("Segoe UI", 10))
-        pt_entry.pack(side="right", fill="x", expand=True)
-
-        row3 = tk.Frame(fr, bg="white")
-        row3.pack(fill="x", padx=50, pady=5)
-        tk.Label(row3, text="Điểm:", font=("Segoe UI", 10),
-                width=10, bg="white").pack(side="left")
-        diem_entry = tk.Entry(row3, font=("Segoe UI", 10))
-        diem_entry.pack(side="right", fill="x", expand=True)
-
-        def submit():
-            nganh_val = nganh_combo.get().split(" - ")[0]
-            data = {
-                "ma_nganh": nganh_val,
-                "phuong_thuc": pt_entry.get().strip(),
-                "diem": diem_entry.get().strip()
-            }
-            try:
-                data["diem"] = float(data["diem"])
-            except:
-                messagebox.showerror("Lỗi", "Điểm phải là số")
-                return
-
-            result = api.post("/tuyen-sinh/submit-application", data)
-            if result.get("success"):
-                messagebox.showinfo("Thành công", "Đã nộp đơn đăng ký")
-                self.show_status()
-            else:
-                messagebox.showerror("Lỗi", result.get("message", "Lỗi"))
-
-        tk.Button(fr, text="Đăng ký", command=submit,
-                 bg="#6A1B9A", fg="white", relief="flat",
-                 cursor="hand2").pack(pady=15)
-
-    def show_status(self):
-        self.clear_content()
-
-        fr = tk.Frame(self.content, bg="white")
-        fr.pack(pady=20, padx=40, fill="both", expand=True)
-
-        tk.Label(fr, text="TRẠNG THÁI ĐĂNG KÝ",
-                font=("Segoe UI", 14, "bold"),
-                bg="white").pack(pady=15)
-
-        result = api.get("/tuyen-sinh/status")
-        if not result.get("success"):
-            tk.Label(fr, text="Chưa có hồ sơ",
-                    font=("Segoe UI", 11), bg="white").pack(pady=30)
-            return
-
-        phieu_list = result["data"].get("phieu_dang_ky", [])
-        if not phieu_list:
-            tk.Label(fr, text="Chưa đăng ký xét tuyển",
-                    font=("Segoe UI", 11), bg="white").pack(pady=30)
-            return
-
-        for pt in phieu_list:
-            status_color = {"Chờ duyệt": "#FF9800", "Đậu": "#4CAF50", "Rớt": "#D32F2F"}
-            bg = status_color.get(pt.get("TrangThai", ""), "#666")
-
-            fr2 = tk.Frame(fr, bg="#f5f5f5", bd=1, relief="solid")
-            fr2.pack(fill="x", pady=5)
-            tk.Label(fr2, text=f"Ngành: {pt.get('MaNganh', '')} | Phương thức: {pt.get('PhuongThuc', '')}",
-                    font=("Segoe UI", 10), bg="#f5f5f5").pack(anchor="w", padx=10, pady=5)
-            tk.Label(fr2, text=f"Điểm: {pt.get('Diem', '')} | Trạng thái: {pt.get('TrangThai', '')}",
-                    font=("Segoe UI", 10, "bold"), bg="#f5f5f5", fg=bg).pack(anchor="w", padx=10, pady=2)
 
     def clear_content(self):
         for w in self.content.winfo_children():

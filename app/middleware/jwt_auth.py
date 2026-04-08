@@ -1,6 +1,6 @@
 """
 JWT Authentication Middleware
-Tạo và verify JWT tokens cho 3 vai trò: admin, student, candidate
+Tạo và verify JWT tokens cho 2 vai trò: admin, student
 """
 import jwt
 from datetime import datetime, timedelta, timezone
@@ -14,7 +14,7 @@ def generate_token(payload: dict, role: str) -> str:
     """
     Tạo JWT token với role
     payload: dict chứa user data (MaAdmin/MaSV/MaTK, email, etc.)
-    role: 'admin' | 'student' | 'candidate'
+    role: 'admin' | 'student'
     """
     token_payload = {
         **payload,
@@ -86,6 +86,4 @@ def role_required(*allowed_roles):
 # Convenience decorators
 admin_required = role_required("admin")
 student_required = role_required("student")
-candidate_required = role_required("candidate")
 admin_or_student = role_required("admin", "student")
-admin_or_candidate = role_required("admin", "candidate")

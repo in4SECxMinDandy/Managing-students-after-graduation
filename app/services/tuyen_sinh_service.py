@@ -1,8 +1,8 @@
 """
 TuyenSinh Service - Business logic cho tuyển sinh
-Quy trình 4 bước:
-1. Thí sinh đăng ký tài khoản (AuthService.register_candidate)
-2. Thí sinh nộp hồ sơ (hso_xet_tuyen)
+Quy trình 4 bước (Admin hoặc Public nộp hồ sơ):
+1. Nộp hồ sơ xét tuyển (hso_xet_tuyen) - Public/Admin
+2. Nộp phiếu đăng ký xét tuyển (pt_xet_tuyen) - Public/Admin
 3. Admin duyệt → Đậu → auto tạo SinhVien
 4. Admin từ chối → Rớt
 """
@@ -13,20 +13,20 @@ from werkzeug.security import generate_password_hash
 from app.models.hso_xet_tuyen import HSOXetTuyen
 from app.models.pt_xet_tuyen import PTXetTuyen
 from app.models.sinh_vien import SinhVien
-from app.models.tk_xet_tuyen import TKXetTuyen
 from app.models.nganh import Nganh
 from app.models.lop import Lop
+from app.models.base import BaseModel
 
 
 class TuyenSinhService:
     """Service xử lý quy trình tuyển sinh"""
 
-    # ========== Thí sinh nộp hồ sơ ==========
+    # ========== Nộp hồ sơ ==========
 
     @classmethod
-    def submit_profile(cls, ma_tk: str, ho_ten: str, cccd: str, so_dien_thoai: str) -> dict:
+    def submit_profile(cls, ho_ten: str, cccd: str, so_dien_thoai: str) -> dict:
         """
-        Thí sinh nộp hồ sơ xét tuyển
+        Nộp hồ sơ xét tuyển (không cần đăng nhập)
         Validation:
         - CCCD: đúng 10 số
         - so_dien_thoai: đúng 10 số
@@ -39,36 +39,24 @@ class TuyenSinhService:
         if not so_dien_thoai.isdigit() or len(so_dien_thoai) != 10:
             return {"success": False, "message": "SĐT phải là 10 chữ số"}
 
-        # Check unique CCCD in tk_xet_tuyen
-        existing_cccd = TKXetTuyen.raw_query(
-            "SELECT * FROM tk_xet_tuyen WHERE cccd = %s",
+        # Check unique CCCD
+        existing_cccd = BaseModel.raw_query(
+            "SELECT * FROM hso_xet_tuyen WHERE cccd = %s",
             (cccd,),
             fetch_one=True
         )
         if existing_cccd:
             return {"success": False, "message": "CCCD đã được sử dụng"}
 
-        # Check unique so_dien_thoai in tk_xet_tuyen
-        existing_sdt = TKXetTuyen.raw_query(
-            "SELECT * FROM tk_xet_tuyen WHERE so_dien_thoai = %s",
-            (so_dien_thoai,),
-            fetch_one=True
-        )
-        if existing_sdt:
-            return {"success": False, "message": "SĐT đã được sử dụng"}
-
-        # Update tk_xet_tuyen with profile info
-        TKXetTuyen.update(ma_tk, {
-            "ho_ten": ho_ten,
-            "cccd": cccd,
-            "so_dien_thoai": so_dien_thoai
-        })
+        # Generate MaHS
+        ma_hs = f"H{random.randint(10000, 99999)}"
 
         # Create HSO record
-        ma_hs = f"H{random.randint(10000, 99999)}"
         hso = HSOXetTuyen.create({
             "ma_hs": ma_hs,
-            "ma_tk": ma_tk,
+            "ho_ten": ho_ten,
+            "cccd": cccd,
+            "so_dien_thoai": so_dien_thoai,
             "dia_chi": "",
             "truong_thpt": "",
             "nam_tot_nghiep": datetime.now().year
@@ -77,13 +65,13 @@ class TuyenSinhService:
         return {"success": True, "data": hso, "message": "Hồ sơ đã được tạo"}
 
     @classmethod
-    def submit_application(cls, ma_tk: str, ma_nganh: str, phuong_thuc: str, diem: float) -> dict:
+    def submit_application(cls, ma_hs: str, ma_nganh: str, phuong_thuc: str, diem: float) -> dict:
         """
-        Thí sinh nộp phiếu đăng ký xét tuyển
+        Nộp phiếu đăng ký xét tuyển
         Validation:
         - Diem: 0-30
         - MaNganh phải tồn tại
-        - Chưa có phiếu đang chờ duyệt cho ngành này
+        - MaHS phải tồn tại
         """
         # Validate Diem
         if diem < 0 or diem > 30:
@@ -93,15 +81,15 @@ class TuyenSinhService:
         if not Nganh.exists(ma_nganh):
             return {"success": False, "message": "Ngành không tồn tại"}
 
-        # Check TK exists
-        tk = TKXetTuyen.find(ma_tk)
-        if not tk:
-            return {"success": False, "message": "Tài khoản không tồn tại"}
+        # Check HSO exists
+        hso = HSOXetTuyen.find(ma_hs)
+        if not hso:
+            return {"success": False, "message": "Hồ sơ không tồn tại"}
 
         # Check pending application for this major
         pending = PTXetTuyen.raw_query(
-            "SELECT * FROM pt_xet_tuyen WHERE ma_tk = %s AND ma_nganh = %s AND trang_thai = 'Cho duyet'",
-            (ma_tk, ma_nganh),
+            "SELECT * FROM pt_xet_tuyen WHERE ma_hs = %s AND ma_nganh = %s AND trang_thai = 'Cho duyet'",
+            (ma_hs, ma_nganh),
             fetch_one=True
         )
         if pending:
@@ -113,7 +101,7 @@ class TuyenSinhService:
         # Create PT
         pt = PTXetTuyen.create({
             "ma_pt": ma_pt,
-            "ma_tk": ma_tk,
+            "ma_hs": ma_hs,
             "ma_nganh": ma_nganh,
             "diem": diem,
             "trang_thai": "Cho duyet",
@@ -137,9 +125,9 @@ class TuyenSinhService:
         if pt["trang_thai"] != "Cho duyet":
             return {"success": False, "message": "Phiếu đã được xử lý"}
 
-        tk = TKXetTuyen.find(pt["ma_tk"])
-        if not tk:
-            return {"success": False, "message": "Tài khoản thí sinh không tồn tại"}
+        hso = HSOXetTuyen.find(pt["ma_hs"])
+        if not hso:
+            return {"success": False, "message": "Hồ sơ không tồn tại"}
 
         # Update PT status
         PTXetTuyen.update_trang_thai(ma_pt, "Dau", ma_admin)
@@ -159,12 +147,12 @@ class TuyenSinhService:
         # Create SinhVien with default password
         sinh_vien = SinhVien.create({
             "ma_sv": ma_sv,
-            "ho_ten": tk["ho_ten"],
+            "ho_ten": hso.get("ho_ten", ""),
             "email": f"{ma_sv}@student.edu.vn",
             "mat_khau": generate_password_hash("123456"),
             "ma_lop": ma_lop,
-            "cccd": tk["cccd"],
-            "so_dien_thoai": tk["so_dien_thoai"]
+            "cccd": hso.get("cccd", ""),
+            "so_dien_thoai": hso.get("so_dien_thoai", "")
         })
 
         return {
@@ -188,20 +176,16 @@ class TuyenSinhService:
 
         return {"success": True, "message": "Đã từ chối tuyển sinh"}
 
-    # ========== Thí sinh xem trạng thái ==========
+    # ========== Xem trạng thái ==========
 
     @classmethod
-    def get_candidate_status(cls, ma_tk: str) -> dict:
-        """Thí sinh xem trạng thái đơn đăng ký"""
-        tk = TKXetTuyen.find(ma_tk)
-        if not tk:
-            return {"success": False, "message": "Chưa có tài khoản"}
-
-        hso = TKXetTuyen.get_ho_so(ma_tk)
+    def get_profile_status(cls, ma_hs: str) -> dict:
+        """Xem trạng thái hồ sơ"""
+        hso = HSOXetTuyen.find(ma_hs)
         if not hso:
-            return {"success": True, "data": {"ho_so": None, "phieu_dang_ky": []}}
+            return {"success": False, "message": "Hồ sơ không tồn tại"}
 
-        pt_list = HSOXetTuyen.get_phieu_dang_ky(hso["ma_hs"])
+        pt_list = HSOXetTuyen.get_phieu_dang_ky(ma_hs)
 
         return {
             "success": True,

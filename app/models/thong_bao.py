@@ -22,11 +22,11 @@ class ThongBao(BaseModel):
 
     @classmethod
     def get_nguoi_nhan(cls, ma_tb: str):
-        """Lấy danh sách người nhận thông báo"""
+        """Lay danh sach nguoi nhan thong bao"""
         return cls.raw_query("""
-            SELECT tbn.*, tk.ho_ten
+            SELECT tbn.*, sv.ho_ten
             FROM tb_nguoi_nhan tbn
-            INNER JOIN tk_xet_tuyen tk ON tbn.ma_nguoi_nhan = tk.ma_tk
+            INNER JOIN sinh_vien sv ON tbn.ma_nguoi_nhan = sv.ma_sv
             WHERE tbn.ma_tb = %s
         """, (ma_tb,))
 

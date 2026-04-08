@@ -116,7 +116,7 @@ class TestPasswordHashing:
 
 
 class TestRoleBasedAccess:
-    """Test phân quyền theo vai trò"""
+    """Test phân quyền theo vai trò (chỉ Admin và Student)"""
 
     def test_admin_role(self):
         """Test role admin"""
@@ -136,26 +136,18 @@ class TestRoleBasedAccess:
         }
         assert token_payload["role"] == "student"
 
-    def test_candidate_role(self):
-        """Test role candidate"""
-        token_payload = {
-            "MaTK": "TK1234",
-            "Email": "test@gmail.com",
-            "role": "candidate"
-        }
-        assert token_payload["role"] == "candidate"
-
     def test_role_comparison(self):
         """Test so sánh role"""
         allowed_roles_admin = ["admin"]
         allowed_roles_student = ["admin", "student"]
-        allowed_roles_all = ["admin", "student", "candidate"]
+        valid_roles = ["admin", "student"]
 
         current_role = "student"
 
         assert current_role in allowed_roles_student
         assert current_role not in allowed_roles_admin
-        assert current_role in allowed_roles_all
+        assert current_role in valid_roles
+        assert "candidate" not in valid_roles
 
 
 class TestLoginValidation:
@@ -184,5 +176,5 @@ class TestLoginValidation:
         valid_ma_sv = "SV2512345678"
         invalid_ma_sv = "SV25"  # Quá ngắn
 
-        assert len(valid_ma_sv) == 10
-        assert len(invalid_ma_sv) < 10
+        assert len(valid_ma_sv) == 12
+        assert len(invalid_ma_sv) < 12
