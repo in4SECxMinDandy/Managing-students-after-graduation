@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
+use Livewire\Mechanisms\ComponentRegistry;
 use Tests\TestCase;
 
 /**
@@ -20,6 +21,26 @@ use Tests\TestCase;
 class AuthGuardsRegressionTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_admin_login_route_renders_successfully(): void
+    {
+        $this->get(route('admin.login'))
+            ->assertOk();
+    }
+
+    public function test_livewire_registry_resolves_modular_admin_login_names(): void
+    {
+        $registry = app(ComponentRegistry::class);
+
+        $this->assertInstanceOf(
+            AdminLogin::class,
+            $registry->new('app.modules.auth.http.livewire.admin-login')
+        );
+        $this->assertInstanceOf(
+            AdminLogin::class,
+            $registry->new('auth.http.livewire.admin-login')
+        );
+    }
 
     public function test_admin_dashboard_redirects_when_guest(): void
     {
