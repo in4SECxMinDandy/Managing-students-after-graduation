@@ -54,6 +54,6 @@ class SinhVien(BaseModel):
             SELECT tb.*, tbn.da_doc, tbn.created_at as thoi_gian_doc
             FROM tb_nguoi_nhan tbn
             INNER JOIN thong_bao tb ON tbn.ma_tb = tb.ma_tb
-            WHERE tbn.loai_nguoi_nhan = 'sinh_vien' AND tbn.ma_nguoi_nhan = %s
+            WHERE tbn.ma_nguoi_nhan = %s AND tbn.loai_nguoi_nhan = 'sinh_vien'
             ORDER BY tb.created_at DESC
         """, (ma_sv,))

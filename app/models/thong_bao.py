@@ -43,12 +43,11 @@ class ThongBao(BaseModel):
     @classmethod
     def mark_as_read(cls, ma_tb: str, ma_sv: str):
         """Đánh dấu đã đọc"""
-        from datetime import date
         cnx, cursor = cls.get_cursor()
         try:
             cursor.execute("""
                 UPDATE tb_nguoi_nhan
-                SET da_doc = 1, updated_at = NOW()
+                SET da_doc = 1
                 WHERE ma_tb = %s AND ma_nguoi_nhan = %s
             """, (ma_tb, ma_sv))
             cnx.commit()

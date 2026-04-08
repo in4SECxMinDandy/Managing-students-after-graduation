@@ -28,10 +28,11 @@ class SinhVienService(BaseService):
             "ma_sv": ma_sv,
             "ho_ten": ho_ten,
             "email": email,
-            "mat_khau": generate_password_hash(mat_khau),
+            "password_hash": generate_password_hash(mat_khau),
             "ma_lop": ma_lop,
             "cccd": cccd or "",
-            "so_dien_thoai": so_dien_thoai or ""
+            "so_dien_thoai": so_dien_thoai or "",
+            "gpa": 0.0
         })
 
         return {"success": True, "data": sinh_vien}

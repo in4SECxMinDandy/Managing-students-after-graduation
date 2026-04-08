@@ -44,7 +44,6 @@ def get_all():
 def create():
     """Admin: Tạo thông báo"""
     data = request.get_json()
-    tieu_de = data.get("tieu_de", "")
     noi_dung = data.get("noi_dung", "")
 
     if not noi_dung:
@@ -53,7 +52,7 @@ def create():
     ma_admin = g.current_user["ma_qt"]
 
     # Tạo thông báo
-    result = ThongBaoService.create_thong_bao(tieu_de, noi_dung, ma_admin)
+    result = ThongBaoService.create_thong_bao("", noi_dung, ma_admin)
 
     if not result["success"]:
         return jsonify({"error": "Bad Request", "message": "Tạo thông báo thất bại"}), 400

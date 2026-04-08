@@ -230,17 +230,29 @@ class LoginWindow:
 
         if result.get("success"):
             api.set_auth(result["token"], result["user"], role)
-            self.root.destroy()
+            self.root.withdraw()
             self.open_dashboard()
         else:
             messagebox.showerror("Lỗi", result.get("message", "Đăng nhập thất bại"))
 
     def open_dashboard(self):
         """Mo dashboard theo role"""
+        # Tao cua so moi, khong reuse root cua login
+        dashboard_root = tk.Toplevel()
+        dashboard_root.protocol("WM_DELETE_WINDOW", lambda: self._exit_app(dashboard_root))
+
         if api.role == "admin":
-            AdminDashboard(tk.Tk())
+            AdminDashboard(dashboard_root)
         elif api.role == "student":
-            StudentDashboard(tk.Tk())
+            StudentDashboard(dashboard_root)
+
+    def _exit_app(self, win):
+        """Dong tat ca cua so khi logout hoac tat dashboard"""
+        win.destroy()
+        self.root.destroy()   # dong ca login window
+        # Ket thuc vong lap chinh
+        if hasattr(self, '_mainloop_running'):
+            self.root.quit()
 
 
 # ========== Main Entry Point ==========
@@ -277,8 +289,8 @@ class BaseDashboard:
         """Đăng xuất"""
         if messagebox.askyesno("Xác nhận", "Bạn có muốn đăng xuất?"):
             api.clear_auth()
-            self.root.destroy()
-            LoginWindow(tk.Tk())
+            self.root.destroy()            # dong dashboard
+            LoginWindow(tk.Tk())          # mo lai cua so dang nhap
 
     def show_error(self, msg):
         messagebox.showerror("Lỗi", msg)
@@ -302,7 +314,7 @@ class AdminDashboard(BaseDashboard):
                 font=("Segoe UI", 16, "bold"),
                 bg="#1565C0", fg="white").pack(side="left", padx=20)
 
-        user_label = tk.Label(header, text=f"Xin chào: {api.user.get('TenDN', api.user.get('HoTen', ''))}",
+        user_label = tk.Label(header, text=f"Xin chào: {api.user.get('ho_ten', api.user.get('email', ''))}",
                             font=("Segoe UI", 10), bg="#1565C0", fg="#BBDEFB")
         user_label.pack(side="right", padx=20)
 
@@ -325,11 +337,11 @@ class AdminDashboard(BaseDashboard):
             ("Ngành", lambda: self.show_crud("Ngành", "/nganh/")),
             ("Lớp", lambda: self.show_crud("Lớp", "/lop/")),
             ("Môn học", lambda: self.show_crud("Môn học", "/mon-hoc/")),
-            ("Tuyển sinh", self.show_tuyen_sinh),
             ("Sinh viên", self.show_sinh_vien),
             ("Học tập", self.show_hoc_tap),
             ("Tốt nghiệp", self.show_tot_nghiep),
             ("Thông báo", self.show_thong_bao),
+            ("Quản trị", self.show_quan_tri),
         ]
 
         tk.Label(sidebar, text="MENU", font=("Segoe UI", 10, "bold"),
@@ -354,7 +366,6 @@ class AdminDashboard(BaseDashboard):
 
         stats = [
             ("Tổng sinh viên", "/sinh-vien/", "👥"),
-            ("Phiếu chờ duyệt", "/tuyen-sinh/pending", "📋"),
             ("Khoa", "/khoa/", "🏛️"),
             ("Ngành", "/nganh/", "📚"),
         ]
@@ -432,91 +443,170 @@ class AdminDashboard(BaseDashboard):
                      font=("Segoe UI", 8), bg="#D32F2F", fg="white",
                      relief="flat", cursor="hand2").pack(side="left", padx=2)
 
-    def show_tuyen_sinh(self):
-        """Quản lý tuyển sinh"""
+    def show_sinh_vien(self):
+        """Quản lý sinh viên"""
         self.clear_content()
 
         header = tk.Frame(self.content, bg="white", height=50)
         header.pack(fill="x", padx=10, pady=(10, 0))
         header.pack_propagate(False)
 
-        tk.Label(header, text="Quản lý Tuyển sinh",
+        tk.Label(header, text="Quản lý Sinh viên",
                 font=("Segoe UI", 14, "bold"),
                 bg="white").pack(side="left", padx=10, pady=10)
 
-        # Stats
-        result = api.get("/tuyen-sinh/all")
-        all_data = result.get("data", [])
-        pending = [p for p in all_data if p.get("TrangThai") == "Chờ duyệt"]
-        approved = [p for p in all_data if p.get("TrangThai") == "Đậu"]
-        rejected = [p for p in all_data if p.get("TrangThai") == "Rớt"]
+        tk.Button(header, text="+ Thêm SV",
+                 command=self.add_sinh_vien,
+                 bg="#4CAF50", fg="white", relief="flat",
+                 cursor="hand2").pack(side="right", padx=10)
 
-        stats_frame = tk.Frame(self.content, bg="white")
-        stats_frame.pack(fill="x", padx=10, pady=5)
+        # Load lop data for edit forms
+        self._sv_lop_options = []
+        lop_result = api.get("/lop/")
+        if lop_result.get("data"):
+            self._sv_lop_options = [(r.get("MaLop", ""), r.get("TenLop", ""))
+                                     for r in lop_result["data"]]
 
-        tk.Label(stats_frame, text=f"Tổng: {len(all_data)} | Chờ duyệt: {len(pending)} | Đậu: {len(approved)} | Rớt: {len(rejected)}",
-                font=("Segoe UI", 10), bg="white").pack(pady=5)
-
-        # Pending table
+        # Table
         table_frame = tk.Frame(self.content, bg="white")
         table_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        if not pending:
-            tk.Label(table_frame, text="Không có phiếu chờ duyệt",
+        result = api.get("/sinh-vien/")
+        if "error" in result:
+            tk.Label(table_frame, text=result["error"], fg="red").pack()
+            return
+
+        data = result.get("data", [])
+        if not data:
+            tk.Label(table_frame, text="Chưa có sinh viên",
                     font=("Segoe UI", 12), bg="white").pack(pady=50)
             return
 
-        tk.Label(table_frame, text="Phiếu chờ duyệt",
-                font=("Segoe UI", 11, "bold"), bg="white").pack(anchor="w", padx=5, pady=5)
-
-        headers = ["Mã PT", "Họ tên", "Ngành", "Phương thức", "Điểm", "Thao tác"]
-        for i, h in enumerate(headers):
-            tk.Label(table_frame, text=h, font=("Segoe UI", 9, "bold"),
+        # Headers: MaSV, HoTen, NgaySinh, Email, MaLop
+        sv_headers = ["ma_sv", "ho_ten", "ngay_sinh", "email", "ma_lop"]
+        col_widths = [12, 20, 12, 25, 10]
+        for i, (h, w) in enumerate(zip(sv_headers, col_widths)):
+            tk.Label(table_frame, text=h, font=("Segoe UI", 10, "bold"),
                     bg="#1976D2", fg="white", relief="ridge",
-                    width=15).grid(row=1, column=i, sticky="nsew", padx=1, pady=1)
+                    width=w).grid(row=0, column=i, sticky="nsew", padx=1, pady=1)
 
-        for row_idx, p in enumerate(pending):
-            values = [p.get("MaPTXT", ""), p.get("HoTenThiSinh", ""),
-                     p.get("TenNganh", ""), p.get("PhuongThuc", ""),
-                     str(p.get("Diem", ""))]
-            for col_idx, val in enumerate(values):
+        for row_idx, row in enumerate(data):
+            for col_idx, key in enumerate(sv_headers):
+                val = str(row.get(key, ""))
                 bg = "white" if row_idx % 2 == 0 else "#E3F2FD"
-                tk.Label(table_frame, text=str(val)[:20], font=("Segoe UI", 9),
+                tk.Label(table_frame, text=val[:30], font=("Segoe UI", 9),
                         bg=bg, relief="ridge", anchor="w",
-                        width=15).grid(row=row_idx + 2, column=col_idx,
-                                      sticky="nsew", padx=1, pady=1)
-
+                        width=col_widths[col_idx]).grid(
+                    row=row_idx + 1, column=col_idx, sticky="nsew", padx=1, pady=1)
+            # Action buttons
             btn_frame = tk.Frame(table_frame, bg=bg)
-            btn_frame.grid(row=row_idx + 2, column=len(headers),
+            btn_frame.grid(row=row_idx + 1, column=len(sv_headers),
                          sticky="nsew", padx=1, pady=1)
-            tk.Button(btn_frame, text="Đậu",
-                     command=lambda pt=p: self.approve_pt(pt["MaPTXT"]),
-                     font=("Segoe UI", 8), bg="#4CAF50", fg="white",
-                     relief="flat", cursor="hand2").pack(side="left", padx=2)
-            tk.Button(btn_frame, text="Rớt",
-                     command=lambda pt=p: self.reject_pt(pt["MaPTXT"]),
+            tk.Button(btn_frame, text="Sửa",
+                     command=lambda r=row: self.edit_sinh_vien(r),
+                     font=("Segoe UI", 8), bg="#FFC107", relief="flat",
+                     cursor="hand2").pack(side="left", padx=2)
+            tk.Button(btn_frame, text="Xóa",
+                     command=lambda r=row: self.delete_sinh_vien(r),
                      font=("Segoe UI", 8), bg="#D32F2F", fg="white",
                      relief="flat", cursor="hand2").pack(side="left", padx=2)
 
-    def approve_pt(self, ma_ptxt):
-        result = api.post(f"/tuyen-sinh/approve/{ma_ptxt}")
-        if result.get("success"):
-            messagebox.showinfo("Thành công", f"Đã duyệt đậu! Mã SV: {result.get('ma_sv')}")
-            self.show_tuyen_sinh()
-        else:
-            messagebox.showerror("Lỗi", result.get("message", "Lỗi"))
+    def add_sinh_vien(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Thêm Sinh viên")
+        center_window(dialog, 420, 380)
+        dialog.configure(bg="white")
 
-    def reject_pt(self, ma_ptxt):
-        result = api.post(f"/tuyen-sinh/reject/{ma_ptxt}")
-        if result.get("success"):
-            messagebox.showinfo("Thành công", "Đã từ chối")
-            self.show_tuyen_sinh()
-        else:
-            messagebox.showerror("Lỗi", result.get("message", "Lỗi"))
+        tk.Label(dialog, text="Thêm Sinh viên mới", font=("Segoe UI", 12, "bold"),
+                bg="white").pack(pady=10)
 
-    def show_sinh_vien(self):
-        """Quản lý sinh viên"""
-        self.show_crud("Sinh viên", "/sinh-vien/")
+        fields = [
+            ("Mã SV:", "ma_sv"), ("Họ tên:", "ho_ten"),
+            ("Ngày sinh:", "ngay_sinh"), ("Email:", "email"),
+            ("Mật khẩu:", "password_hash"), ("Mã Lớp:", "ma_lop"),
+            ("SDT:", "so_dien_thoai"), ("CCCD:", "cccd"),
+        ]
+        entries = {}
+        form_frame = tk.Frame(dialog, bg="white")
+        form_frame.pack(fill="x", padx=20, pady=5)
+        for label, key in fields:
+            fr = tk.Frame(form_frame, bg="white")
+            fr.pack(fill="x", pady=3)
+            tk.Label(fr, text=label, width=14, bg="white", anchor="e").pack(side="left")
+            show = "*" if key == "password_hash" else ""
+            e = tk.Entry(fr, font=("Segoe UI", 10), show=show)
+            e.pack(side="right", fill="x", expand=True)
+            entries[key] = e
+
+        def submit():
+            data = {k: e.get().strip() for k, e in entries.items()}
+            if not data.get("ma_sv") or not data.get("ho_ten"):
+                messagebox.showerror("Lỗi", "Mã SV và Họ tên bắt buộc")
+                return
+            result = api.post("/sinh-vien/", data)
+            if result.get("success"):
+                messagebox.showinfo("Thành công", "Đã thêm sinh viên")
+                dialog.destroy()
+                self.show_sinh_vien()
+            else:
+                messagebox.showerror("Lỗi", result.get("message", result.get("error", "Lỗi")))
+
+        tk.Button(dialog, text="Lưu", command=submit,
+                 bg="#4CAF50", fg="white", relief="flat", cursor="hand2").pack(pady=10)
+
+    def edit_sinh_vien(self, row):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Sửa Sinh viên")
+        center_window(dialog, 420, 340)
+        dialog.configure(bg="white")
+
+        ma_sv = row.get("ma_sv", "")
+
+        tk.Label(dialog, text=f"Sửa: {ma_sv}", font=("Segoe UI", 12, "bold"),
+                bg="white").pack(pady=10)
+
+        fields = [
+            ("Mã SV:", "ma_sv", True), ("Họ tên:", "ho_ten", False),
+            ("Email:", "email", False), ("SDT:", "so_dien_thoai", False),
+            ("CCCD:", "cccd", False),
+        ]
+        entries = {}
+        form_frame = tk.Frame(dialog, bg="white")
+        form_frame.pack(fill="x", padx=20, pady=5)
+        for label, key, readonly in fields:
+            fr = tk.Frame(form_frame, bg="white")
+            fr.pack(fill="x", pady=3)
+            tk.Label(fr, text=label, width=14, bg="white", anchor="e").pack(side="left")
+            e = tk.Entry(form_frame, font=("Segoe UI", 10))
+            e.insert(0, str(row.get(key, "")))
+            if readonly:
+                e.configure(state="readonly")
+            e.pack(fill="x")
+            entries[key] = e
+
+        def submit():
+            data = {k: e.get().strip() for k, e in entries.items()}
+            payload = {k: v for k, v in data.items() if k != "MaSV"}
+            result = api.put(f"/sinh-vien/{ma_sv}", payload)
+            if result.get("success"):
+                messagebox.showinfo("Thành công", "Đã cập nhật")
+                dialog.destroy()
+                self.show_sinh_vien()
+            else:
+                messagebox.showerror("Lỗi", result.get("message", result.get("error", "Lỗi")))
+
+        tk.Button(dialog, text="Lưu", command=submit,
+                 bg="#1976D2", fg="white", relief="flat", cursor="hand2").pack(pady=10)
+
+    def delete_sinh_vien(self, row):
+        ma_sv = row.get("ma_sv", "")
+        if messagebox.askyesno("Xác nhận", f"Xóa sinh viên {ma_sv}?"):
+            result = api.delete(f"/sinh-vien/{ma_sv}")
+            if result.get("success"):
+                messagebox.showinfo("Thành công", "Đã xóa sinh viên")
+                self.show_sinh_vien()
+            else:
+                messagebox.showerror("Lỗi", result.get("message", "Lỗi"))
 
     def show_hoc_tap(self):
         """Quản lý học tập"""
@@ -583,8 +673,8 @@ class AdminDashboard(BaseDashboard):
                     width=12).grid(row=0, column=i, sticky="nsew", padx=1, pady=1)
 
         for row_idx, d in enumerate(data):
-            values = [d.get("MaMH", ""), d.get("TenMH", ""),
-                     str(d.get("SoTinChi", "")), str(d.get("Diem", ""))]
+            values = [d.get("ma_mh", ""), d.get("ten_mh", ""),
+                     str(d.get("so_tin_chi", "")), str(d.get("diem", ""))]
             for col_idx, val in enumerate(values):
                 bg = "white" if row_idx % 2 == 0 else "#E3F2FD"
                 tk.Label(self.diem_result, text=str(val)[:20], font=("Segoe UI", 9),
@@ -722,7 +812,7 @@ class AdminDashboard(BaseDashboard):
                     font=("Segoe UI", 9, "bold"), bg="white").pack(anchor="w", padx=5)
             tk.Label(fr, text=tb.get('NoiDung', ''),
                     font=("Segoe UI", 10), bg="white").pack(anchor="w", padx=5, pady=2)
-            tk.Label(fr, text=f"Ngày: {tb.get('NgayGui', '')} | Admin: {tb.get('TenAdmin', 'N/A')}",
+            tk.Label(fr, text=f"Ngày: {tb.get('created_at', '')} | Admin: {tb.get('ten_admin', 'N/A')}",
                     font=("Segoe UI", 8), fg="#666", bg="white").pack(anchor="w", padx=5, pady=2)
 
     def tao_thong_bao(self):
@@ -772,10 +862,149 @@ class AdminDashboard(BaseDashboard):
             w.destroy()
 
     def add_item(self, title, endpoint):
-        messagebox.showinfo("Thêm", f"Form thêm {title}")
+        """Generic add dialog"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title(f"Thêm {title}")
+        center_window(dialog, 400, 320)
+        dialog.configure(bg="white")
+
+        tk.Label(dialog, text=f"Thêm {title} mới", font=("Segoe UI", 12, "bold"),
+                bg="white").pack(pady=10)
+
+        result = api.get(endpoint)
+        # Get column hints from existing data
+        columns = []
+        if result.get("data") and len(result["data"]) > 0:
+            columns = [k for k in result["data"][0].keys() if k not in ("MatKhau",)]
+        else:
+            defaults = {
+                "Khoa": [("Mã Khoa", "MaKhoa", 2), ("Tên Khoa", "TenKhoa", 50)],
+                "Ngành": [("Mã Ngành", "MaNganh", 4), ("Tên Ngành", "TenNganh", 50), ("Mã Khoa", "MaKhoa", 2)],
+                "Lớp": [("Mã Lớp", "MaLop", 11), ("Tên Lớp", "TenLop", 50), ("Mã Ngành", "MaNganh", 4)],
+                "Môn học": [("Mã MH", "MaMH", 7), ("Tên MH", "TenMH", 50), ("Số TC", "SoTinChi", 2)],
+            }
+            if title in defaults:
+                for label, key, width in defaults[title]:
+                    tk.Label(dialog, text=f"{label}:", bg="white", anchor="w").pack(anchor="w", padx=30)
+
+        # Build form based on known entity fields
+        fields_config = {
+            "Khoa": [("Mã Khoa", "MaKhoa"), ("Tên Khoa", "TenKhoa")],
+            "Ngành": [("Mã Ngành", "MaNganh"), ("Tên Ngành", "TenNganh"), ("Mã Khoa", "MaKhoa")],
+            "Lớp": [("Mã Lớp", "MaLop"), ("Tên Lớp", "TenLop"), ("Mã Ngành", "MaNganh")],
+            "Môn học": [("Mã MH", "MaMH"), ("Tên MH", "TenMH"), ("Số TC", "SoTinChi")],
+        }
+
+        entries = {}
+        if title in fields_config:
+            form_frame = tk.Frame(dialog, bg="white")
+            form_frame.pack(fill="x", padx=20, pady=5)
+            for label, key in fields_config[title]:
+                fr = tk.Frame(form_frame, bg="white")
+                fr.pack(fill="x", pady=4)
+                tk.Label(fr, text=f"{label}:", width=14, bg="white", anchor="e").pack(side="left")
+                e = tk.Entry(fr, font=("Segoe UI", 10))
+                e.pack(side="right", fill="x", expand=True)
+                entries[key] = e
+        else:
+            tk.Label(dialog, text="Form chưa hỗ trợ cho " + title,
+                    bg="white").pack(pady=20)
+
+        def submit():
+            data = {k: e.get().strip() for k, e in entries.items()}
+            # Convert PascalCase label-keys to snake_case API keys
+            snake_map = {
+                "MaKhoa": "ma_khoa", "TenKhoa": "ten_khoa",
+                "MaNganh": "ma_nganh", "TenNganh": "ten_nganh",
+                "MaLop": "ma_lop", "TenLop": "ten_lop",
+                "MaMH": "ma_mh", "TenMH": "ten_mh",
+                "SoTinChi": "so_tin_chi",
+            }
+            snake_data = {snake_map.get(k, k): v for k, v in data.items()}
+            if "so_tin_chi" in snake_data:
+                try:
+                    snake_data["so_tin_chi"] = int(snake_data["so_tin_chi"])
+                except:
+                    messagebox.showerror("Lỗi", "Số tín chỉ phải là số nguyên")
+                    return
+            result = api.post(endpoint, snake_data)
+            if result.get("success"):
+                messagebox.showinfo("Thành công", f"Đã thêm {title}")
+                dialog.destroy()
+                self.show_crud(title, endpoint)
+            else:
+                messagebox.showerror("Lỗi", result.get("message", result.get("error", "Lỗi")))
+
+        tk.Button(dialog, text="Lưu", command=submit,
+                 bg="#4CAF50", fg="white", relief="flat",
+                 cursor="hand2").pack(pady=10)
 
     def edit_item(self, title, endpoint, row):
-        messagebox.showinfo("Sửa", f"Form sửa {title}: {row}")
+        """Generic edit dialog — pre-populated"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title(f"Sửa {title}")
+        center_window(dialog, 400, 320)
+        dialog.configure(bg="white")
+
+        pk_key = list(row.keys())[0]
+        pk_val = row[pk_key]
+
+        tk.Label(dialog, text=f"Sửa {title}", font=("Segoe UI", 12, "bold"),
+                bg="white").pack(pady=10)
+
+        fields_config = {
+            "Khoa": [("Mã Khoa", "MaKhoa", True), ("Tên Khoa", "TenKhoa", False)],
+            "Ngành": [("Mã Ngành", "MaNganh", True), ("Tên Ngành", "TenNganh", False), ("Mã Khoa", "MaKhoa", False)],
+            "Lớp": [("Mã Lớp", "MaLop", True), ("Tên Lớp", "TenLop", False), ("Mã Ngành", "MaNganh", False)],
+            "Môn học": [("Mã MH", "MaMH", True), ("Tên MH", "TenMH", False), ("Số TC", "SoTinChi", False)],
+        }
+
+        entries = {}
+        if title in fields_config:
+            form_frame = tk.Frame(dialog, bg="white")
+            form_frame.pack(fill="x", padx=20, pady=5)
+            for label, key, readonly in fields_config[title]:
+                fr = tk.Frame(form_frame, bg="white")
+                fr.pack(fill="x", pady=4)
+                tk.Label(fr, text=f"{label}:", width=14, bg="white", anchor="e").pack(side="left")
+                e = tk.Entry(fr, font=("Segoe UI", 10))
+                e.insert(0, str(row.get(key, "")))
+                if readonly:
+                    e.configure(state="readonly")
+                e.pack(side="right", fill="x", expand=True)
+                entries[key] = e
+        else:
+            tk.Label(dialog, text="Form chưa hỗ trợ cho " + title,
+                    bg="white").pack(pady=20)
+
+        def submit():
+            data = {k: e.get().strip() for k, e in entries.items()}
+            # Convert PascalCase label-keys to snake_case API keys
+            snake_map = {
+                "MaKhoa": "ma_khoa", "TenKhoa": "ten_khoa",
+                "MaNganh": "ma_nganh", "TenNganh": "ten_nganh",
+                "MaLop": "ma_lop", "TenLop": "ten_lop",
+                "MaMH": "ma_mh", "TenMH": "ten_mh",
+                "SoTinChi": "so_tin_chi",
+            }
+            snake_data = {snake_map.get(k, k): v for k, v in data.items()}
+            if "so_tin_chi" in snake_data:
+                try:
+                    snake_data["so_tin_chi"] = int(snake_data["so_tin_chi"])
+                except:
+                    messagebox.showerror("Lỗi", "Số tín chỉ phải là số nguyên")
+                    return
+            result = api.put(endpoint + pk_val, snake_data)
+            if result.get("success"):
+                messagebox.showinfo("Thành công", f"Đã cập nhật {title}")
+                dialog.destroy()
+                self.show_crud(title, endpoint)
+            else:
+                messagebox.showerror("Lỗi", result.get("message", result.get("error", "Lỗi")))
+
+        tk.Button(dialog, text="Lưu", command=submit,
+                 bg="#1976D2", fg="white", relief="flat",
+                 cursor="hand2").pack(pady=10)
 
     def delete_item(self, title, endpoint, pk):
         if messagebox.askyesno("Xác nhận", f"Xóa {title}?"):
@@ -786,12 +1015,181 @@ class AdminDashboard(BaseDashboard):
             else:
                 messagebox.showerror("Lỗi", result.get("message", "Lỗi"))
 
+    def show_quan_tri(self):
+        """Quản lý tài khoản quản trị"""
+        self.clear_content()
+
+        header = tk.Frame(self.content, bg="white", height=50)
+        header.pack(fill="x", padx=10, pady=(10, 0))
+
+        tk.Label(header, text="Quản lý Tài khoản Admin",
+                font=("Segoe UI", 14, "bold"),
+                bg="white").pack(side="left", padx=10, pady=10)
+
+        tk.Button(header, text="+ Thêm Admin",
+                 command=self.add_quan_tri,
+                 bg="#4CAF50", fg="white", relief="flat",
+                 cursor="hand2").pack(side="right", padx=10)
+
+        result = api.get("/quan-tri/")
+        if "error" in result:
+            tk.Label(self.content, text=result["error"],
+                    fg="red", bg="white").pack(pady=20)
+            return
+
+        data = result.get("data", [])
+        if not data:
+            tk.Label(self.content, text="Chưa có tài khoản admin",
+                    font=("Segoe UI", 12), bg="white").pack(pady=50)
+            return
+
+        table_frame = tk.Frame(self.content, bg="white")
+        table_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        headers = list(data[0].keys())
+        col_widths = [10, 25, 25, 12]
+        for i, (h, w) in enumerate(zip(headers, col_widths)):
+            tk.Label(table_frame, text=h, font=("Segoe UI", 10, "bold"),
+                    bg="#1976D2", fg="white", relief="ridge",
+                    width=w).grid(row=0, column=i, sticky="nsew", padx=1, pady=1)
+
+        for row_idx, row in enumerate(data):
+            for col_idx, key in enumerate(headers):
+                val = str(row.get(key, ""))
+                bg = "white" if row_idx % 2 == 0 else "#E3F2FD"
+                tk.Label(table_frame, text=val[:30], font=("Segoe UI", 9),
+                        bg=bg, relief="ridge", anchor="w",
+                        width=col_widths[col_idx]).grid(
+                    row=row_idx + 1, column=col_idx, sticky="nsew", padx=1, pady=1)
+            # Action buttons
+            btn_frame = tk.Frame(table_frame, bg=bg)
+            btn_frame.grid(row=row_idx + 1, column=len(headers),
+                         sticky="nsew", padx=1, pady=1)
+            tk.Button(btn_frame, text="Sửa",
+                     command=lambda r=row: self.edit_quan_tri(r),
+                     font=("Segoe UI", 8), bg="#FFC107", relief="flat",
+                     cursor="hand2").pack(side="left", padx=2)
+            tk.Button(btn_frame, text="Xóa",
+                     command=lambda r=row: self.delete_quan_tri(r),
+                     font=("Segoe UI", 8), bg="#D32F2F", fg="white",
+                     relief="flat", cursor="hand2").pack(side="left", padx=2)
+
+    def add_quan_tri(self):
+        """Add admin account dialog"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Thêm Admin")
+        center_window(dialog, 400, 300)
+        dialog.configure(bg="white")
+
+        tk.Label(dialog, text="Thêm Tài khoản Admin", font=("Segoe UI", 12, "bold"),
+                bg="white").pack(pady=10)
+
+        fields = [
+            ("Mã Admin:", "ma_qt"),
+            ("Họ tên:", "ho_ten"),
+            ("Email (đăng nhập):", "email"),
+            ("Mật khẩu:", "password_hash"),
+        ]
+        entries = {}
+        for label, key in fields:
+            fr = tk.Frame(dialog, bg="white")
+            fr.pack(fill="x", padx=20, pady=5)
+            tk.Label(fr, text=label, width=16, bg="white", anchor="e").pack(side="left")
+            show = "*" if key == "password_hash" else ""
+            e = tk.Entry(fr, font=("Segoe UI", 10), show=show)
+            e.pack(side="right", fill="x", expand=True)
+            entries[key] = e
+
+        def submit():
+            data = {k: e.get().strip() for k, e in entries.items()}
+            if not all(data.values()):
+                messagebox.showerror("Lỗi", "Vui lòng điền đầy đủ thông tin")
+                return
+            # Backend expects password_hash key for password
+            result = api.post("/quan-tri/", {
+                "ma_qt": data["ma_qt"],
+                "ho_ten": data["ho_ten"],
+                "email": data["email"],
+                "password_hash": data["password_hash"]
+            })
+            if result.get("success"):
+                messagebox.showinfo("Thành công", "Đã thêm tài khoản admin")
+                dialog.destroy()
+                self.show_quan_tri()
+            else:
+                messagebox.showerror("Lỗi", result.get("message", result.get("error", "Lỗi")))
+
+        tk.Button(dialog, text="Lưu", command=submit,
+                 bg="#4CAF50", fg="white", relief="flat",
+                 cursor="hand2").pack(pady=10)
+
+    def edit_quan_tri(self, row):
+        """Edit admin account dialog"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Sửa Admin")
+        center_window(dialog, 400, 320)
+        dialog.configure(bg="white")
+
+        ma_admin = row.get("ma_qt", "")
+
+        tk.Label(dialog, text="Sửa Tài khoản Admin", font=("Segoe UI", 12, "bold"),
+                bg="white").pack(pady=10)
+
+        fields = [
+            ("Mã Admin:", "ma_qt", True),
+            ("Họ tên:", "ho_ten", False),
+            ("Email (đăng nhập):", "email", False),
+            ("Mật khẩu mới:", "password_hash", False),
+        ]
+        entries = {}
+        for label, key, readonly in fields:
+            fr = tk.Frame(dialog, bg="white")
+            fr.pack(fill="x", padx=20, pady=5)
+            tk.Label(fr, text=label, width=20, bg="white", anchor="e").pack(side="left")
+            e = tk.Entry(fr, font=("Segoe UI", 10))
+            e.insert(0, str(row.get(key, "")))
+            if readonly:
+                e.configure(state="readonly")
+            e.pack(side="right", fill="x", expand=True)
+            entries[key] = e
+
+        def submit():
+            data = {k: e.get().strip() for k, e in entries.items()}
+            if not data.get("ho_ten") or not data.get("email"):
+                messagebox.showerror("Lỗi", "Họ tên và Email bắt buộc")
+                return
+            payload = {"ho_ten": data["ho_ten"], "email": data["email"]}
+            if data.get("password_hash"):
+                payload["password_hash"] = data["password_hash"]
+            result = api.put(f"/quan-tri/{ma_admin}", payload)
+            if result.get("success"):
+                messagebox.showinfo("Thành công", "Đã cập nhật")
+                dialog.destroy()
+                self.show_quan_tri()
+            else:
+                messagebox.showerror("Lỗi", result.get("message", result.get("error", "Lỗi")))
+
+        tk.Button(dialog, text="Lưu", command=submit,
+                 bg="#1976D2", fg="white", relief="flat",
+                 cursor="hand2").pack(pady=10)
+
+    def delete_quan_tri(self, row):
+        ma_admin = row.get("ma_qt", "")
+        if not messagebox.askyesno("Xác nhận", f"Xóa admin {ma_admin}?"):
+            return
+        result = api.delete(f"/quan-tri/{ma_admin}")
+        if result.get("success"):
+            messagebox.showinfo("Thành công", "Đã xóa tài khoản")
+            self.show_quan_tri()
+        else:
+            messagebox.showerror("Lỗi", result.get("message", result.get("error", "Lỗi")))
+
 
 # ========== Student Dashboard ==========
 
 class StudentDashboard(BaseDashboard):
     def __init__(self, root):
-        self.ma_sv = api.user.get("MaSV", "")
+        self.ma_sv = api.user.get("ma_sv", "")
         super().__init__(root, "Sinh viên")
 
     def setup_ui(self):
@@ -803,7 +1201,7 @@ class StudentDashboard(BaseDashboard):
                 font=("Segoe UI", 16, "bold"),
                 bg="#1565C0", fg="white").pack(side="left", padx=20)
 
-        tk.Label(header, text=f"Xin chào: {api.user.get('HoTen', '')}",
+        tk.Label(header, text=f"Xin chào: {api.user.get('ho_ten', '')}",
                 font=("Segoe UI", 10), bg="#1565C0", fg="#BBDEFB").pack(side="right", padx=20)
         tk.Button(header, text="Đăng xuất", command=self.logout,
                  bg="#D32F2F", fg="white", relief="flat",
@@ -845,12 +1243,12 @@ class StudentDashboard(BaseDashboard):
             sv = data.get("sinh_vien", {})
 
             info = [
-                ("Mã SV:", sv.get("MaSV", "")),
-                ("Họ tên:", sv.get("HoTen", "")),
-                ("Email:", sv.get("Email", "")),
-                ("Ngày sinh:", sv.get("NgaySinh", "")),
-                ("Lớp:", data.get("lop", {}).get("TenLop", "N/A") if data.get("lop") else "N/A"),
-                ("Ngành:", data.get("nganh", {}).get("TenNganh", "N/A") if data.get("nganh") else "N/A"),
+                ("Mã SV:", sv.get("ma_sv", "")),
+                ("Họ tên:", sv.get("ho_ten", "")),
+                ("Email:", sv.get("email", "")),
+                ("Ngày sinh:", sv.get("ngay_sinh", "")),
+                ("Lớp:", data.get("lop", {}).get("ten_lop", "N/A") if data.get("lop") else "N/A"),
+                ("Ngành:", data.get("nganh", {}).get("ten_nganh", "N/A") if data.get("nganh") else "N/A"),
             ]
 
             for label, value in info:
@@ -885,8 +1283,8 @@ class StudentDashboard(BaseDashboard):
                     width=w).grid(row=0, column=i, sticky="nsew", padx=1, pady=1)
 
         for row_idx, d in enumerate(data):
-            values = [row_idx + 1, d.get("MaMH", ""), d.get("TenMH", ""),
-                     str(d.get("SoTinChi", "")), str(d.get("Diem", ""))]
+            values = [row_idx + 1, d.get("ma_mh", ""), d.get("ten_mh", ""),
+                     str(d.get("so_tin_chi", "")), str(d.get("diem", ""))]
             for col_idx, val in enumerate(values):
                 bg = "white" if row_idx % 2 == 0 else "#E8F5E9"
                 tk.Label(table, text=str(val)[:25], font=("Segoe UI", 9),

@@ -14,3 +14,5 @@ venv/
 env/
 node_modules/
 vendor/
+.claude/
+*.log

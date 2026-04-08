@@ -2,7 +2,6 @@
 ThongBao Service - Business logic cho thông báo
 """
 import uuid
-from datetime import datetime
 
 from app.models.thong_bao import ThongBao
 from app.models.sinh_vien import SinhVien
@@ -14,7 +13,6 @@ class ThongBaoService:
     @classmethod
     def create_thong_bao(cls, tieu_de: str, noi_dung: str, ma_admin: str, doi_tuong: str = "all") -> dict:
         """Admin tạo thông báo"""
-        # Generate MaTB
         ma_tb = f"TB{uuid.uuid4().hex[:8].upper()}"
 
         tb = ThongBao.create({
@@ -98,7 +96,7 @@ class ThongBaoService:
 
         thong_bao_list = SinhVien.get_thong_bao(ma_sv)
 
-        # Count unread
+        # Count unread — da_doc is 0 (unread) or 1 (read)
         unread_count = sum(1 for tb in thong_bao_list if not tb.get("da_doc"))
 
         return {
@@ -115,7 +113,7 @@ class ThongBaoService:
         """Xóa thông báo"""
         from app.models.base import BaseModel
 
-        # Delete TB_NguoiNhan first (FK)
+        # Delete tb_nguoi_nhan first (FK)
         BaseModel.raw_query("DELETE FROM tb_nguoi_nhan WHERE ma_tb = %s", (ma_tb,))
 
         if ThongBao.delete(ma_tb):
