@@ -336,7 +336,6 @@ class AdminDashboard(BaseDashboard):
             ("Khoa", lambda: self.show_crud("Khoa", "/khoa/")),
             ("Ngành", lambda: self.show_crud("Ngành", "/nganh/")),
             ("Lớp", lambda: self.show_crud("Lớp", "/lop/")),
-            ("Môn học", lambda: self.show_crud("Môn học", "/mon-hoc/")),
             ("Sinh viên", self.show_sinh_vien),
             ("Học tập", self.show_hoc_tap),
             ("Tốt nghiệp", self.show_tot_nghiep),
@@ -808,32 +807,57 @@ class AdminDashboard(BaseDashboard):
         for tb in data:
             fr = tk.Frame(list_frame, bg="#fff", bd=1, relief="solid")
             fr.pack(fill="x", pady=2, padx=5)
-            tk.Label(fr, text=f"Mã: {tb.get('MaTB', '')}",
-                    font=("Segoe UI", 9, "bold"), bg="white").pack(anchor="w", padx=5)
-            tk.Label(fr, text=tb.get('NoiDung', ''),
+
+            # Tieu de
+            tieu_de = tb.get('tieu_de', '')
+            if tieu_de:
+                tk.Label(fr, text=tieu_de,
+                        font=("Segoe UI", 10, "bold"), bg="white",
+                        fg="#1565C0").pack(anchor="w", padx=5, pady=(5, 0))
+
+            # Noi dung
+            tk.Label(fr, text=tb.get('noi_dung', ''),
                     font=("Segoe UI", 10), bg="white").pack(anchor="w", padx=5, pady=2)
-            tk.Label(fr, text=f"Ngày: {tb.get('created_at', '')} | Admin: {tb.get('ten_admin', 'N/A')}",
-                    font=("Segoe UI", 8), fg="#666", bg="white").pack(anchor="w", padx=5, pady=2)
+
+            # Ngay tao + Admin
+            created = tb.get('created_at', '')
+            if created:
+                created = str(created)
+            tk.Label(fr, text=f"Ngày tạo: {created[:19].replace('T', ' ')} | "
+                            f"Admin: {tb.get('ten_admin', 'N/A')}",
+                    font=("Segoe UI", 8), fg="#666", bg="white").pack(anchor="w", padx=5, pady=(0, 5))
 
     def tao_thong_bao(self):
         dialog = tk.Toplevel(self.root)
         dialog.title("Tạo thông báo")
-        center_window(dialog, 400, 300)
+        center_window(dialog, 450, 380)
         dialog.configure(bg="white")
 
         tk.Label(dialog, text="Tạo Thông báo", font=("Segoe UI", 12, "bold"),
                 bg="white").pack(pady=10)
 
+        # Tieu de
+        fr_tieu_de = tk.Frame(dialog, bg="white")
+        fr_tieu_de.pack(fill="x", padx=20, pady=4)
+        tk.Label(fr_tieu_de, text="Tiêu đề:", bg="white", width=10, anchor="e").pack(side="left")
+        tieu_de_entry = tk.Entry(fr_tieu_de, font=("Segoe UI", 10), width=35)
+        tieu_de_entry.pack(side="right", fill="x", expand=True)
+
+        # Noi dung
         tk.Label(dialog, text="Nội dung:", bg="white").pack(anchor="w", padx=20)
-        noi_dung = tk.Text(dialog, font=("Segoe UI", 10), height=6, width=40)
+        noi_dung = tk.Text(dialog, font=("Segoe UI", 10), height=7, width=45)
         noi_dung.pack(padx=20, pady=5)
 
-        tk.Label(dialog, text="Gửi đến:", bg="white").pack(anchor="w", padx=20)
-        gui_den = ttk.Combobox(dialog, values=["Tất cả SV", "Theo lớp", "Theo ngành"])
+        # Gui den
+        gui_den_frame = tk.Frame(dialog, bg="white")
+        gui_den_frame.pack(fill="x", padx=20, pady=5)
+        tk.Label(gui_den_frame, text="Gửi đến:", bg="white", width=10, anchor="e").pack(side="left")
+        gui_den = ttk.Combobox(gui_den_frame, values=["Tất cả SV", "Theo lớp", "Theo ngành"], width=25)
         gui_den.set("Tất cả SV")
-        gui_den.pack(padx=20, pady=5)
+        gui_den.pack(side="right", fill="x", expand=True)
 
         def submit():
+            td = tieu_de_entry.get().strip()
             nd = noi_dung.get("1.0", tk.END).strip()
             if not nd:
                 messagebox.showerror("Lỗi", "Nhập nội dung")
@@ -845,13 +869,13 @@ class AdminDashboard(BaseDashboard):
             elif gui_den.get() == "Theo ngành":
                 gd = "nganh"
 
-            result = api.post("/thong-bao/", {"noi_dung": nd, "gui_den": gd})
+            result = api.post("/thong-bao/", {"tieu_de": td, "noi_dung": nd, "gui_den": gd})
             if result.get("success"):
                 messagebox.showinfo("Thành công", "Đã tạo thông báo")
                 dialog.destroy()
                 self.show_thong_bao()
             else:
-                messagebox.showerror("Lỗi", result.get("message", "Lỗi"))
+                messagebox.showerror("Lỗi", result.get("message", result.get("error", "Lỗi")))
 
         tk.Button(dialog, text="Gửi", command=submit,
                  bg="#4CAF50", fg="white", relief="flat",

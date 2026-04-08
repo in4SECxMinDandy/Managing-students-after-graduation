@@ -34,9 +34,6 @@ def seed_all():
         seed_lop(cursor)
         conn.commit()
 
-        seed_mon_hoc(cursor)
-        conn.commit()
-
         seed_admins(cursor)
         conn.commit()
 
@@ -92,17 +89,30 @@ def seed_nganh(cursor):
 
 def seed_lop(cursor):
     print("  Seeding lop...")
-    for ma, ten, mn in [
-        ("D21CN01", "CNTT-K21", "CN01"),
-        ("D21CN02", "CNPM-K21", "CN02"),
-        ("D21KT01", "TCNH-K21", "KT01"),
-        ("D21LQ01", "LKT-K21", "LQ01"),
-    ]:
+    classes = [
+        # Khoa CNTT - Khoa hoc may tinh
+        ("D21CN01", "CNTT-K21", "CN01", "2021"),
+        ("D22CN01", "CNTT-K22", "CN01", "2022"),
+        ("D23CN01", "CNTT-K23", "CN01", "2023"),
+        # Khoa CNTT - Cong nghe phan mem
+        ("D21CN02", "CNPM-K21", "CN02", "2021"),
+        ("D22CN02", "CNPM-K22", "CN02", "2022"),
+        ("D23CN02", "CNPM-K23", "CN02", "2023"),
+        # Khoa Kinh te - Tai chinh Ngan hang
+        ("D21KT01", "TCNH-K21", "KT01", "2021"),
+        ("D22KT01", "TCNH-K22", "KT01", "2022"),
+        ("D23KT01", "TCNH-K23", "KT01", "2023"),
+        # Khoa Luat - Luat kinh te
+        ("D21LQ01", "LKT-K21", "LQ01", "2021"),
+        ("D22LQ01", "LKT-K22", "LQ01", "2022"),
+        ("D23LQ01", "LKT-K23", "LQ01", "2023"),
+    ]
+    for ma, ten, mn, kh in classes:
         cursor.execute(
             "INSERT IGNORE INTO lop (ma_lop, ten_lop, ma_nganh, khoa_hoc) VALUES (%s, %s, %s, %s)",
-            (ma, ten, mn, "2021")
+            (ma, ten, mn, kh)
         )
-    print(f"    ✓ 4 classes seeded")
+    print(f"    ✓ {len(classes)} classes seeded")
 
 
 def seed_mon_hoc(cursor):
@@ -147,24 +157,69 @@ def seed_admins(cursor):
 def seed_sinh_vien(cursor):
     print("  Seeding sinh_vien (students)...")
     students = [
-        # CNTT class
+        # CNTT-K21 (D21CN01) - 5 students
         ("B21DCCN001", "Nguyen Minh Anh", "anh.nm@svl.edu.vn", "B21DCCN001", "D21CN01", "0123456781", "001234567890"),
         ("B21DCCN002", "Le Hoang Nam", "nam.lh@svl.edu.vn", "B21DCCN002", "D21CN01", "0123456782", "001234567891"),
         ("B21DCCN003", "Pham Thu Ha", "ha.pt@svl.edu.vn", "B21DCCN003", "D21CN01", "0123456783", "001234567892"),
         ("B21DCCN004", "Hoang Duc Minh", "minh.hd@svl.edu.vn", "B21DCCN004", "D21CN01", "0123456784", "001234567893"),
         ("B21DCCN005", "Tran Lan Phuong", "phuong.tl@svl.edu.vn", "B21DCCN005", "D21CN01", "0123456785", "001234567894"),
-        # CNPM class
+        # CNPM-K21 (D21CN02) - 4 students
         ("B21DCCP001", "Vu Quang Huy", "huy.vq@svl.edu.vn", "B21DCCP001", "D21CN02", "0123456786", "001234567895"),
         ("B21DCCP002", "Dang Minh Thao", "thao.dm@svl.edu.vn", "B21DCCP002", "D21CN02", "0123456787", "001234567896"),
         ("B21DCCP003", "Bui Thanh Son", "son.bt@svl.edu.vn", "B21DCCP003", "D21CN02", "0123456788", "001234567897"),
-        # KinhTe class
-        ("B21DKT001", "Ly Thi Mai Linh", "linh.lt@svl.edu.vn", "B21DKT001", "D21KT01", "0123456789", "001234567898"),
-        ("B21DKT002", "Ngo Dinh Phong", "phong.nd@svl.edu.vn", "B21DKT002", "D21KT01", "0123456790", "001234567899"),
-        ("B21DKT003", "Chu Thi Bich Ngoc", "ngoc.ctb@svl.edu.vn", "B21DKT003", "D21KT01", "0123456791", "001234567800"),
-        # Luat class
-        ("B21DLQ001", "Trinh Minh Quan", "quan.tm@svl.edu.vn", "B21DLQ001", "D21LQ01", "0123456792", "001234567801"),
-        ("B21DLQ002", "Dinh Thu Huong", "huong.dt@svl.edu.vn", "B21DLQ002", "D21LQ01", "0123456793", "001234567802"),
-        ("B21DLQ003", "Cao Van Tien", "tien.cv@svl.edu.vn", "B21DLQ003", "D21LQ01", "0123456794", "001234567803"),
+        ("B21DCCP004", "Phan Thi Thanh Van", "van.ptt@svl.edu.vn", "B21DCCP004", "D21CN02", "0123456789", "001234567898"),
+        # TCNH-K21 (D21KT01) - 4 students
+        ("B21DKT001", "Ly Thi Mai Linh", "linh.lt@svl.edu.vn", "B21DKT001", "D21KT01", "0123456790", "001234567899"),
+        ("B21DKT002", "Ngo Dinh Phong", "phong.nd@svl.edu.vn", "B21DKT002", "D21KT01", "0123456791", "001234567800"),
+        ("B21DKT003", "Chu Thi Bich Ngoc", "ngoc.ctb@svl.edu.vn", "B21DKT003", "D21KT01", "0123456792", "001234567801"),
+        ("B21DKT004", "Do Quang Vinh", "vinh.dq@svl.edu.vn", "B21DKT004", "D21KT01", "0123456793", "001234567802"),
+        # LKT-K21 (D21LQ01) - 4 students
+        ("B21DLQ001", "Trinh Minh Quan", "quan.tm@svl.edu.vn", "B21DLQ001", "D21LQ01", "0123456794", "001234567803"),
+        ("B21DLQ002", "Dinh Thu Huong", "huong.dt@svl.edu.vn", "B21DLQ002", "D21LQ01", "0123456795", "001234567804"),
+        ("B21DLQ003", "Cao Van Tien", "tien.cv@svl.edu.vn", "B21DLQ003", "D21LQ01", "0123456796", "001234567805"),
+        ("B21DLQ004", "Nguyen Thi Thu Hien", "hien.ntt@svl.edu.vn", "B21DLQ004", "D21LQ01", "0123456797", "001234567806"),
+        # CNTT-K22 (D22CN01) - 5 students
+        ("B22DCCN001", "Pham Van Long", "long.pv@svl.edu.vn", "B22DCCN001", "D22CN01", "0123456798", "001234567807"),
+        ("B22DCCN002", "Tran Thi Mai Anh", "anh.ttm@svl.edu.vn", "B22DCCN002", "D22CN01", "0123456799", "001234567808"),
+        ("B22DCCN003", "Hoang Van Tuan", "tuan.hv@svl.edu.vn", "B22DCCN003", "D22CN01", "0123456800", "001234567809"),
+        ("B22DCCN004", "La Thi Lan Huong", "huong.ltl@svl.edu.vn", "B22DCCN004", "D22CN01", "0123456801", "001234567810"),
+        ("B22DCCN005", "Nguyen Van Hoang", "hoang.nv@svl.edu.vn", "B22DCCN005", "D22CN01", "0123456802", "001234567811"),
+        # CNPM-K22 (D22CN02) - 4 students
+        ("B22DCCP001", "Vu Thi Phuong Thao", "pthao.vt@svl.edu.vn", "B22DCCP001", "D22CN02", "0123456803", "001234567812"),
+        ("B22DCCP002", "Tran Quang Nam", "nam.tq@svl.edu.vn", "B22DCCP002", "D22CN02", "0123456804", "001234567813"),
+        ("B22DCCP003", "Le Thi Thu Ha", "ha.lth@svl.edu.vn", "B22DCCP003", "D22CN02", "0123456805", "001234567814"),
+        ("B22DCCP004", "Phan Tien Dat", "dat.pt@svl.edu.vn", "B22DCCP004", "D22CN02", "0123456806", "001234567815"),
+        # TCNH-K22 (D22KT01) - 4 students
+        ("B22DKT001", "Pham Ngoc Lan", "lan.pn@svl.edu.vn", "B22DKT001", "D22KT01", "0123456807", "001234567816"),
+        ("B22DKT002", "Trinh Van Tien", "tien.tv@svl.edu.vn", "B22DKT002", "D22KT01", "0123456808", "001234567817"),
+        ("B22DKT003", "Nguyen Thi Bich Thao", "thao.ntbt@svl.edu.vn", "B22DKT003", "D22KT01", "0123456809", "001234567818"),
+        ("B22DKT004", "Hoang Thanh Huan", "huan.ht@svl.edu.vn", "B22DKT004", "D22KT01", "0123456810", "001234567819"),
+        # LKT-K22 (D22LQ01) - 4 students
+        ("B22DLQ001", "Vu Van Thang", "thang.vv@svl.edu.vn", "B22DLQ001", "D22LQ01", "0123456811", "001234567820"),
+        ("B22DLQ002", "Tran Thi Thu Thuy", "thuy.ttt@svl.edu.vn", "B22DLQ002", "D22LQ01", "0123456812", "001234567821"),
+        ("B22DLQ003", "Ngo Dinh Hieu", "hieu.nd@svl.edu.vn", "B22DLQ003", "D22LQ01", "0123456813", "001234567822"),
+        ("B22DLQ004", "Le Thi Thanh Truc", "truc.ltt@svl.edu.vn", "B22DLQ004", "D22LQ01", "0123456814", "001234567823"),
+        # CNTT-K23 (D23CN01) - 5 students
+        ("B23DCCN001", "Nguyen Huu Khoi", "khoi.nh@svl.edu.vn", "B23DCCN001", "D23CN01", "0123456815", "001234567824"),
+        ("B23DCCN002", "Tran Ngoc Linh", "linh.tn@svl.edu.vn", "B23DCCN002", "D23CN01", "0123456816", "001234567825"),
+        ("B23DCCN003", "Pham Quoc Viet", "viet.pq@svl.edu.vn", "B23DCCN003", "D23CN01", "0123456817", "001234567826"),
+        ("B23DCCN004", "Ly Quynh Chi", "chi.lq@svl.edu.vn", "B23DCCN004", "D23CN01", "0123456818", "001234567827"),
+        ("B23DCCN005", "Hoang Van Duc", "duc.hv@svl.edu.vn", "B23DCCN005", "D23CN01", "0123456819", "001234567828"),
+        # CNPM-K23 (D23CN02) - 4 students
+        ("B23DCCP001", "Le Thanh Mai", "mai.lt@svl.edu.vn", "B23DCCP001", "D23CN02", "0123456820", "001234567829"),
+        ("B23DCCP002", "Vu Van Phuc", "phuc.vv@svl.edu.vn", "B23DCCP002", "D23CN02", "0123456821", "001234567830"),
+        ("B23DCCP003", "Tran Van Sang", "sang.tv@svl.edu.vn", "B23DCCP003", "D23CN02", "0123456822", "001234567831"),
+        ("B23DCCP004", "Nguyen Thi Thanh Hien", "hien.ntth@svl.edu.vn", "B23DCCP004", "D23CN02", "0123456823", "001234567832"),
+        # TCNH-K23 (D23KT01) - 4 students
+        ("B23DKT001", "Nguyen Thi Ngoc Anh", "anh.ntn@svl.edu.vn", "B23DKT001", "D23KT01", "0123456824", "001234567833"),
+        ("B23DKT002", "Phan Van Dung", "dung.pv@svl.edu.vn", "B23DKT002", "D23KT01", "0123456825", "001234567834"),
+        ("B23DKT003", "Tran Thi Hoai Thuong", "thuong.tth@svl.edu.vn", "B23DKT003", "D23KT01", "0123456826", "001234567835"),
+        ("B23DKT004", "Do Van Manh", "manh.dv@svl.edu.vn", "B23DKT004", "D23KT01", "0123456827", "001234567836"),
+        # LKT-K23 (D23LQ01) - 4 students
+        ("B23DLQ001", "Pham Van Thanh", "thanh.pv@svl.edu.vn", "B23DLQ001", "D23LQ01", "0123456828", "001234567837"),
+        ("B23DLQ002", "Nguyen Thi Hong Nhung", "nhung.nth@svl.edu.vn", "B23DLQ002", "D23LQ01", "0123456829", "001234567838"),
+        ("B23DLQ003", "Tran Van Hao", "hao.tv@svl.edu.vn", "B23DLQ003", "D23LQ01", "0123456830", "001234567839"),
+        ("B23DLQ004", "Phan Thi Xuan Mai", "mai.ptx@svl.edu.vn", "B23DLQ004", "D23LQ01", "0123456831", "001234567840"),
     ]
     for ma_sv, ho_ten, email, pw, ma_lop, sdt, cccd in students:
         ph = generate_password_hash(pw)
@@ -185,10 +240,14 @@ def seed_kq_hoc_tap(cursor):
     cursor.execute("SELECT ma_mh FROM mon_hoc")
     ma_mhs = [r[0] for r in cursor.fetchall()]
 
-    cnnn = [s for s in ma_svs if s.startswith("B21DCCN")]
-    cnpm = [s for s in ma_svs if s.startswith("B21DCCP")]
-    kt   = [s for s in ma_svs if s.startswith("B21DKT")]
-    lq   = [s for s in ma_svs if s.startswith("B21DLQ")]
+    if not ma_mhs:
+        print("    ⚠ mon_hoc table empty — skipping grade seeding")
+        return
+
+    cnnn = [s for s in ma_svs if s.startswith("B21DCCN") or s.startswith("B22DCCN") or s.startswith("B23DCCN")]
+    cnpm = [s for s in ma_svs if s.startswith("B21DCCP") or s.startswith("B22DCCP") or s.startswith("B23DCCP")]
+    kt   = [s for s in ma_svs if s.startswith("B21DKT") or s.startswith("B22DKT") or s.startswith("B23DKT")]
+    lq   = [s for s in ma_svs if s.startswith("B21DLQ") or s.startswith("B22DLQ") or s.startswith("B23DLQ")]
 
     all_mh = ma_mhs
     basic_mh = [m for m in ma_mhs if m in ("INT10001", "MATH1001", "MATH1002")]

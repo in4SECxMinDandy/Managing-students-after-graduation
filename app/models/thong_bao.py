@@ -34,7 +34,14 @@ class ThongBao(BaseModel):
     def get_all_with_creator(cls):
         """Lấy tất cả thông báo với tên admin tạo"""
         return cls.raw_query("""
-            SELECT t.*, q.ho_ten as ten_admin
+            SELECT
+                t.ma_tb,
+                t.tieu_de,
+                t.noi_dung,
+                t.doi_tuong,
+                t.nguoi_tao,
+                t.created_at,
+                q.ho_ten as ten_admin
             FROM thong_bao t
             LEFT JOIN quan_tri q ON t.nguoi_tao = q.ma_qt
             ORDER BY t.created_at DESC
